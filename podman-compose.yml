@@ -1,0 +1,33 @@
+# Install at /opt/backend/podman-compose.yml (root:root 0644).
+#
+# Backend (DeSo node) podman-compose definition. The image tag is NOT baked into
+# this file: /opt/backend/deploy.sh pulls the requested tag and writes the single
+# line `IMAGE=ghcr.io/blue-blip-droid/backend:<tag>` to /opt/backend/.deploy. The
+# systemd unit (backend.service) loads that file via `EnvironmentFile=`, exporting
+# $IMAGE into the environment podman-compose inherits, which is why the image
+# below is `${IMAGE}`. If $IMAGE is unset the `:?` guard makes compose abort with
+# an explanatory message instead of pulling a wrong or empty image. deploy.sh
+# consumes this file exactly as:
+#     podman-compose -f /opt/backend/podman-compose.yml down
+#     podman-compose -f /opt/backend/podman-compose.yml up -d
+# so it MUST keep the `services:` schema with a single `backend:` service.
+services:
+  backend:
+    image: ${IMAGE:?IMAGE not set — run deploy.sh, which writes /opt/backend/.deploy}
+    container_name: backend
+    pull_policy: never              # deploy.sh already podman-pulled the exact tag
+    restart: unless-stopped         # process-crash restart within a boot; systemd handles reboot
+    #
+    # --- service-specific runtime config (operator: fill these in) ---
+    # DeSo backend needs at least: a node config (JSON), a data directory for the
+    # chain, and P2P + REST ports. Below are commented placeholders — uncomment and
+    # set the real values for your deployment.
+    #
+    # ports:
+    #   - "127.0.0.1:<REST_HOST_PORT>:<REST_CONTAINER_PORT>"   # REST/RPC
+    #   - "<P2P_HOST_PORT>:<P2P_CONTAINER_PORT>"               # P2P (may need non-loopback)
+    # environment:
+    #   - DESO_CONFIG=/config/config.json
+    # volumes:
+    #   - /opt/backend/config:/config:ro        # node JSON config (root-owned, read-only)
+    #   - /opt/backend/data:/data               # chain data directory (persistent)

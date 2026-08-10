@@ -1,0 +1,40 @@
+# Install at /etc/systemd/system/backend.service (root:root 0644), then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now backend.service
+#
+# Prerequisites on the host (see .env/setup/deploy-user-setup.md + deploy.sh):
+#   * the deploy account exists and owns /opt/backend/.deploy (written by deploy.sh);
+#   * `sudo loginctl enable-linger deploy` so /run/user/<deploy-uid> exists at boot
+#     (rootless podman needs XDG_RUNTIME_DIR);
+#   * /opt/backend/podman-compose.yml + /opt/backend/deploy.sh installed
+#     (deploy.sh root:root 0755; the dir root:root 0755);
+#   * deploy can pull the image: either the GHCR package is PUBLIC or you have
+#     run `sudo -u deploy podman login ghcr.io` with a token on the server.
+
+[Unit]
+Description=backend podman-compose service (runs as deploy)
+Documentation=file:///opt/backend/podman-compose.yml
+Wants=network-online.target
+After=network-online.target podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/backend
+Environment=HOME=/home/deploy
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+# .deploy holds IMAGE=<ref> (written by deploy.sh); loaded into the service
+# environment so the podman-compose child interpolates ${IMAGE}.
+EnvironmentFile=-/opt/backend/.deploy
+
+ExecStartPre=-/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml down'
+ExecStart=/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml up -d'
+ExecStop=/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml down'
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

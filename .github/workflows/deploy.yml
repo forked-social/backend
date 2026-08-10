@@ -1,0 +1,61 @@
+name: Deploy backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (e.g. latest, v1.2.3, or a git SHA)"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: read
+
+# Prevent two deploys of the same service from racing.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve deploy host
+        id: host
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ]; then
+            echo "::error::The DEPLOY_HOST organization secret is not set."
+            exit 1
+          fi
+          echo "host=$DEPLOY_HOST" >> "$GITHUB_OUTPUT"
+
+      - name: Install OpenSSH client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq openssh-client
+
+      - name: Trigger deploy over SSH (key loaded in-memory via ssh-agent; never written to disk)
+        env:
+          HOST: ${{ steps.host.outputs.host }}
+          TAG: ${{ inputs.tag }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -eu
+          [ -n "$DEPLOY_SSH_KEY" ] || { echo "::error::The DEPLOY_SSH_KEY organization secret is not set."; exit 1; }
+          # ~/.ssh must exist so StrictHostKeyChecking=accept-new can persist the server host key.
+          install -d -m 700 "$HOME/.ssh"
+          # Load the private key directly from stdin into an ssh-agent running in THIS shell,
+          # so the key material is never written to disk on the runner. The EXIT trap guarantees
+          # the agent is stopped at the end, success or failure.
+          eval "$(ssh-agent -s)"
+          trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" | ssh-add -
+          echo "Triggering deploy of tag '$TAG' for service 'backend' on $HOST ..."
+          # Wire protocol: two tokens "<tag> <service>" -> sshd ForceCommand dispatcher
+          # -> /opt/backend/deploy.sh "$TAG" "backend".
+          # accept-new trusts first-seen host key (TOFU); for hardening, pin via a known_hosts secret.
+          # NOTE: no -i and no IdentitiesOnly here -- the key material comes from the ssh-agent;
+          # adding IdentitiesOnly without -i would make ssh offer NO identities and auth would fail.
+          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+              "deploy@$HOST" "$TAG backend"
