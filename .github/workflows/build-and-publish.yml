@@ -1,0 +1,125 @@
+name: Build and Publish Backend Image
+
+# Manually triggered by a maintainer. Builds the backend container image with
+# podman and publishes it to the GitHub Container Registry (ghcr.io).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Optional image tag. If set, the image is additionally pushed under
+          this tag. When left empty, only the Git SHA and `latest` are used.
+        required: false
+        default: ""
+        type: string
+      core_repository:
+        description: >-
+          Repository that provides the sibling `core` build context.
+          The production Dockerfile COPYs from `../core`, so this is checked
+          out next to `backend` to assemble the expected monorepo layout.
+        required: false
+        default: "deso-protocol/core"
+        type: string
+      core_ref:
+        description: Git ref to check out for the `core` build context.
+        required: false
+        default: "main"
+        type: string
+
+# The GITHUB_TOKEN needs to read the repo contents and push packages to ghcr.io.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build (podman) and push to ghcr.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backend (this repository)
+        uses: actions/checkout@v4
+        with:
+          path: backend
+
+      - name: Checkout core (sibling build context)
+        # The Dockerfile is written for a monorepo root context: it does
+      #   COPY backend/go.mod backend/
+      #   COPY core/go.mod     core/
+      #   COPY core/bls        ../core/bls
+      # Since `backend` is a standalone repo, a plain checkout would not
+      # provide `core/`. We therefore check out `core` as a sibling so the
+      # workspace root matches the Dockerfile's expected context.
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.core_repository }}
+          ref: ${{ inputs.core_ref }}
+          path: core
+
+      - name: Compute image name and tags
+        id: vars
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # GHCR rejects uppercase, so lowercase the owner/repo.
+          REPO_LC=$(printf '%s' "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LC}"
+          SHA=$(printf '%s' "$GITHUB_SHA" | cut -c1-12)
+          {
+            echo "image=${IMAGE}"
+            echo "sha=${SHA}"
+            echo "custom_tag=${INPUT_TAG}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Image:  ${IMAGE}"
+          echo "Tags:   ${SHA}, latest${INPUT_TAG:+, ${INPUT_TAG}}"
+
+      - name: Login to GitHub Container Registry
+        run: |
+          set -euo pipefail
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" \
+            | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image with podman
+        # Build context is the workspace root, which now contains both
+        # `backend/` and `core/` exactly as the Dockerfile's COPY directives
+        # expect. The Dockerfile itself lives in `backend/`.
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+          SHA: ${{ steps.vars.outputs.sha }}
+        run: |
+          set -euo pipefail
+          podman build \
+            -f backend/Dockerfile \
+            -t "${IMAGE}:${SHA}" \
+            .
+
+      - name: Tag image (latest, and optional user tag)
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+          SHA: ${{ steps.vars.outputs.sha }}
+          CUSTOM_TAG: ${{ steps.vars.outputs.custom_tag }}
+        run: |
+          set -euo pipefail
+          podman tag "${IMAGE}:${SHA}" "${IMAGE}:latest"
+          if [ -n "${CUSTOM_TAG}" ]; then
+            podman tag "${IMAGE}:${SHA}" "${IMAGE}:${CUSTOM_TAG}"
+          fi
+          podman images "${IMAGE}"
+
+      - name: Push image to ghcr.io
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+          SHA: ${{ steps.vars.outputs.sha }}
+          CUSTOM_TAG: ${{ steps.vars.outputs.custom_tag }}
+        run: |
+          set -euo pipefail
+          podman push "${IMAGE}:${SHA}"
+          podman push "${IMAGE}:latest"
+          if [ -n "${CUSTOM_TAG}" ]; then
+            podman push "${IMAGE}:${CUSTOM_TAG}"
+          fi
+
+      - name: Logout from GitHub Container Registry
+        if: always()
+        shell: bash
+        run: podman logout ghcr.io || true
