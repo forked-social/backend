@@ -8,8 +8,7 @@ on:
         required: true
         default: "latest"
 
-permissions:
-  contents: read
+permissions: {}
 
 # Prevent two deploys of the same service from racing.
 concurrency:
@@ -18,7 +17,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    environment: deploy
     timeout-minutes: 15
     steps:
       - name: Resolve deploy host
@@ -40,22 +40,43 @@ jobs:
           HOST: ${{ steps.host.outputs.host }}
           TAG: ${{ inputs.tag }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           set -eu
           [ -n "$DEPLOY_SSH_KEY" ] || { echo "::error::The DEPLOY_SSH_KEY organization secret is not set."; exit 1; }
-          # ~/.ssh must exist so StrictHostKeyChecking=accept-new can persist the server host key.
+          [ -n "$DEPLOY_KNOWN_HOSTS" ] || { echo "::error::The DEPLOY_KNOWN_HOSTS organization secret is not set."; exit 1; }
+          [ -n "$DEPLOY_PORT" ] || { echo "::error::The DEPLOY_PORT organization secret is not set."; exit 1; }
+          # ~/.ssh hosts the pinned server host key (known_hosts).
           install -d -m 700 "$HOME/.ssh"
+          # Seed known_hosts from the pinned host-key secret, then enforce STRICT host-key
+          # checking -- no TOFU, no auto-add. IMPORTANT: if DEPLOY_PORT is not the default 22,
+          # the secret MUST have been generated with `ssh-keyscan -p "$DEPLOY_PORT" -t ed25519 <host>`,
+          # because non-standard ports store keys as `[host]:port`. A missing or mismatched key
+          # fails the connection loudly (intended behaviour).
+          umask 077
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           # Load the private key directly from stdin into an ssh-agent running in THIS shell,
           # so the key material is never written to disk on the runner. The EXIT trap guarantees
           # the agent is stopped at the end, success or failure.
           eval "$(ssh-agent -s)"
           trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
           printf '%s\n' "$DEPLOY_SSH_KEY" | ssh-add -
-          echo "Triggering deploy of tag '$TAG' for service 'backend' on $HOST ..."
+          echo "Triggering deploy of tag '$TAG' for service 'backend' on $HOST:$DEPLOY_PORT ..."
           # Wire protocol: two tokens "<tag> <service>" -> sshd ForceCommand dispatcher
           # -> /opt/backend/deploy.sh "$TAG" "backend".
-          # accept-new trusts first-seen host key (TOFU); for hardening, pin via a known_hosts secret.
           # NOTE: no -i and no IdentitiesOnly here -- the key material comes from the ssh-agent;
           # adding IdentitiesOnly without -i would make ssh offer NO identities and auth would fail.
-          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+          ssh -p "$DEPLOY_PORT" \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              -o PasswordAuthentication=no \
+              -o PreferredAuthentications=publickey \
+              -o ConnectTimeout=10 \
               "deploy@$HOST" "$TAG backend"
+
+      - name: Clean up local SSH artifacts
+        if: always()
+        run: |
+          pkill -u "$(id -un)" -x ssh-agent 2>/dev/null || true
+          rm -rf "$HOME/.ssh"
