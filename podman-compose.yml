@@ -2,32 +2,39 @@
 #
 # Backend (DeSo node) podman-compose definition. The image tag is NOT baked into
 # this file: /opt/backend/deploy.sh pulls the requested tag and writes the single
-# line `IMAGE=ghcr.io/blue-blip-droid/backend:<tag>` to /opt/backend/.deploy. The
+# line `IMAGE=ghcr.io/forked-social/backend:<tag>` to /opt/backend/.deploy. The
 # systemd unit (backend.service) loads that file via `EnvironmentFile=`, exporting
 # $IMAGE into the environment podman-compose inherits, which is why the image
 # below is `${IMAGE}`. If $IMAGE is unset the `:?` guard makes compose abort with
-# an explanatory message instead of pulling a wrong or empty image. deploy.sh
-# consumes this file exactly as:
+# an explanatory message. deploy.sh consumes this file exactly as:
 #     podman-compose -f /opt/backend/podman-compose.yml down
 #     podman-compose -f /opt/backend/podman-compose.yml up -d
-# so it MUST keep the `services:` schema with a single `backend:` service.
+#
+# PERSISTENCE: deploy.sh's down/up recreates the container on every deploy, so
+# all state that must survive lives in the bind mounts below, and
+# /opt/backend/.env (loaded via env_file) points the node at the mount targets:
+#     host /opt/backend/data/chain  <- badger chain DB + checkpoints  (/data)
+#     host /opt/backend/data/logs   <- glog *.INFO/*.WARNING/...      (/logs)
+# Pre-create the data dirs deploy-owned once (deploy cannot create entries in
+# the root-owned service dir):
+#     sudo install -d -o deploy -g deploy -m 0755 /opt/backend/data/chain /opt/backend/data/logs
 services:
   backend:
     image: ${IMAGE:?IMAGE not set — run deploy.sh, which writes /opt/backend/.deploy}
     container_name: backend
     pull_policy: never              # deploy.sh already podman-pulled the exact tag
     restart: unless-stopped         # process-crash restart within a boot; systemd handles reboot
+    env_file:
+      - .env                        # DATA_DIR=/data, LOG_DIR=/logs (+ optional flags)
+    volumes:
+      - /opt/backend/data/chain:/data
+      - /opt/backend/data/logs:/logs
     #
     # --- service-specific runtime config (operator: fill these in) ---
-    # DeSo backend needs at least: a node config (JSON), a data directory for the
-    # chain, and P2P + REST ports. Below are commented placeholders — uncomment and
-    # set the real values for your deployment.
-    #
     # ports:
-    #   - "127.0.0.1:<REST_HOST_PORT>:<REST_CONTAINER_PORT>"   # REST/RPC
-    #   - "<P2P_HOST_PORT>:<P2P_CONTAINER_PORT>"               # P2P (may need non-loopback)
+    #   - "127.0.0.1:<REST_HOST_PORT>:<CONTAINER_API_PORT>"   # REST/RPC (set API_PORT in .env)
+    #   - "<P2P_HOST_PORT>:17000"                              # P2P (mainnet protocol port default 17000)
     # environment:
     #   - DESO_CONFIG=/config/config.json
-    # volumes:
+    # volumes (additional):
     #   - /opt/backend/config:/config:ro        # node JSON config (root-owned, read-only)
-    #   - /opt/backend/data:/data               # chain data directory (persistent)
