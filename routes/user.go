@@ -3797,11 +3797,28 @@ func GetPubKeyBytesFromBase58Check(pubKeyBase58Check string) (_pubKeyBytes []byt
 	return pubKeyBytes, nil
 }
 
+// GetPublicKeyPrefix returns the human-readable prefix that every
+// Base58Check-encoded public key on the configured network is guaranteed to
+// start with. It is derived from the network's public-key prefix bytes so
+// that it is correct for fork networks (FS1… mainnet / tFS… testnet) as well
+// as upstream networks (BC… / tBC…).
 func (fes *APIServer) GetPublicKeyPrefix() string {
-	if fes.Params.NetworkType == lib.NetworkType_MAINNET {
-		return "BC"
-	} else {
+	// The prefix is not an encoding of the prefix bytes themselves — it is the
+	// leading substring that is stable across all 40-byte key encodings for a
+	// given prefix-byte triple, so map each known network to its prefix.
+	switch fes.Params.Base58PrefixPublicKey {
+	case lib.ForkMainnetParams.Base58PrefixPublicKey:
+		// Fork mainnet keys always render as FS1… (54 chars).
+		return "FS1"
+	case lib.ForkTestnetParams.Base58PrefixPublicKey:
+		// Fork testnet keys always render as tFS… (54 chars).
+		return "tFS"
+	case lib.DeSoTestnetParams.Base58PrefixPublicKey:
+		// Upstream testnet keys always render as tBC… (54 chars).
 		return "tBC"
+	default:
+		// Upstream mainnet keys always render as BC… (55 chars).
+		return "BC"
 	}
 }
 

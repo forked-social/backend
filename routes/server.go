@@ -1448,7 +1448,7 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 		{
 			"GetValidatorByPublicKeyBase58Check",
 			[]string{"GET"},
-			RoutePathValidators + "/{publicKeyBase58Check:t?BC[1-9A-HJ-NP-Za-km-z]{51,53}}",
+			RoutePathValidators + "/" + makePublicKeyParamRegex(publicKeyBase58CheckKey),
 			fes.GetValidatorByPublicKeyBase58Check,
 			PublicAccess,
 		},
@@ -3354,7 +3354,19 @@ func (fes *APIServer) makePKIDMapJSONEncodable(restrictedKeysMap map[lib.PKID][]
 	return outputMap
 }
 
-const publicKeyParamRegex = "t?BC[1-9A-HJ-NP-Za-km-z]{51,53}"
+// publicKeyParamRegex matches the Base58Check public keys of every network
+// this backend can serve in gorilla/mux path parameters:
+//   - upstream mainnet: BC1…  keys (55 chars, prefix bytes [0xCD,0x14,0x00])
+//   - upstream testnet: tBCK… keys (54 chars, prefix bytes [0x11,0xC2,0x00])
+//   - fork mainnet:     FS13… keys (54 chars, prefix bytes [0x05,0x01,0xED])
+//   - fork testnet:     tFS2… keys (54 chars, prefix bytes [0x11,0xC8,0x7D])
+//
+// The upstream branches preserve the historical pattern verbatim (including
+// its couple chars of length slack); the fork branches are exact-length
+// because the fixed three-byte prefixes guarantee 54-char base58 encodings.
+// Note: the alternation MUST be a non-capturing group — gorilla/mux panics on
+// capture groups inside path patterns.
+const publicKeyParamRegex = "(?:BC[1-9A-HJ-NP-Za-km-z]{51,53}|tBC[1-9A-HJ-NP-Za-km-z]{51,53}|FS1[1-9A-HJ-NP-Za-km-z]{51}|tFS[1-9A-HJ-NP-Za-km-z]{51})"
 
 func makePublicKeyParamRegex(paramName string) string {
 	return fmt.Sprintf("{%s:%s}", paramName, publicKeyParamRegex)

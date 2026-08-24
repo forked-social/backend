@@ -11,6 +11,16 @@ more.
 
 # About This Repo
 
+## forked-social deployment pointers
+
+- Seed node: `backend/podman-compose.yml` + `backend/deploy.env` (env wiring
+  reference; secrets injected at runtime, public keys only in the repo).
+- PoS validators (fork mainnet): compose files, env templates and the
+  launch-day runbook live in [`validators/`](validators/README.md).
+- Validator bootstrap tool (fund → register → stake before the epoch-1
+  snapshot at block ~145): `scripts/pos/validator_bootstrap/main.go`
+  (see the runbook for the in-container build/run commands).
+
 Documentation for this repo lives on docs.deso.org. Specifically, the following
 docs should give you everything you need to get started:
 

@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
-
+# UPSTREAM-DEPRECATED: this script was rewritten for the forked-social launch.
+# It previously started an upstream DeSo mainnet node with upstream miner keys
+# and deso-seed-2.io bootstrap references — all removed.
+#
+# Runs a fork mainnet node with mining. Public keys only: never add seed
+# phrases or mnemonics to this file. Blocks are produced with zero PoW reward
+# (the entire supply is allocated at genesis), so --miner-public-keys only
+# attributes the mined blocks.
 DATE=`date +%Y%m%d-%H:%M:%S-%N`
 
 rm /tmp/main.*.log
 
-(cd ../../ && go build -o backend -gcflags="all=-N -l" main.go && \
+(cd ../../ && go build -o backend main.go && \
   ./backend run \
+  --forknet \
+  --data-dir=$HOME/data_dirs/fork_n0 \
   --glog-v=0 \
-  --glog-vmodule="*bitcoin_manager*=0,*balance*=0,*view*=0,*frontend*=0,*peer*=0,*addr*=0,*network*=0,*utils*=0,*connection*=0,*main*=0,*server*=0,*mempool*=0,*miner*=0,*blockchain*=0" \
-  --num-mining-threads=1  \
+  --num-mining-threads=1 \
   --txindex=true \
-  --admin-public-keys=* \
-  --super-admin-public-keys=* \
-  --miner-public-keys=BC1YLgKZyfgyNntCMXAZYExM8JooYqrYvVsrR8d8XVxorDruYFdq31p \
-  --starter-deso-seed='road congress client market couple bid risk escape artwork rookie artwork food' \
-  --data-dir=$HOME/data_dirs/n0_2  \
-  --block-cypher-api-key=092dae962ea44b02809a4c74408b42a1 \
-  --min-satoshis-for-profile=0 \
-  --connect-ips=deso-seed-2.io:17000 \
-  --hypersync-max-queue-size=10 \
-  --run-hot-feed-routine=true
+  --admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
+  --super-admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
+  --miner-public-keys=FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv
 )
-
-# These are nodes that can be relied upon if the decentralized seed
-# node discovery mechanism fails.
-# --connectips=35.232.92.5:17000

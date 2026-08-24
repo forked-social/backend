@@ -13,6 +13,7 @@ import (
 	"github.com/deso-protocol/core/bls"
 	"github.com/deso-protocol/core/collections"
 	"github.com/deso-protocol/core/lib"
+	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 )
 
@@ -445,11 +446,23 @@ func (fes *APIServer) GetCurrentEpochProgress(ww http.ResponseWriter, req *http.
 		currentView = currentTip.Header.GetView() + estimateNumTimeoutsSinceTip(time.Now(), currentTipTimestamp, timeoutDuration)
 	}
 
-	currentLeaderIdx := (currentEpochEntry.InitialLeaderIndexOffset +
-		(currentView - currentEpochEntry.InitialView) -
-		(currentTip.Header.Height - currentEpochEntry.InitialBlockHeight) -
-		leaderIdxAdjustmentForValidators) % uint64(len(leaderSchedule))
-	currentLeader := leaderSchedule[currentLeaderIdx]
+	// Guard against an empty leader schedule: before any validator has registered
+	// (e.g. during the pre-launch window), the snapshot leader schedule is empty
+	// and the modulo below would divide by zero and panic this route. In that case
+	// there is no current leader, so we respond with a zeroed one alongside the
+	// rest of the epoch progress.
+	currentLeader := UserInfoBasic{}
+	if len(leaderSchedule) == 0 {
+		glog.Infof("GetCurrentEpochProgress: leader schedule is empty (no validators registered yet); returning zero-leader epoch progress")
+		// Render the schedule as [] rather than null in the JSON response.
+		leaderSchedule = []UserInfoBasic{}
+	} else {
+		currentLeaderIdx := (currentEpochEntry.InitialLeaderIndexOffset +
+			(currentView - currentEpochEntry.InitialView) -
+			(currentTip.Header.Height - currentEpochEntry.InitialBlockHeight) -
+			leaderIdxAdjustmentForValidators) % uint64(len(leaderSchedule))
+		currentLeader = leaderSchedule[currentLeaderIdx]
+	}
 
 	// Construct the response
 	response := GetEpochProgressResponse{

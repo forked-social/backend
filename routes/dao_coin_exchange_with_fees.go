@@ -316,15 +316,15 @@ func GetTradingFeesForMarket(
 			profilePublicKey, err)
 	}
 
-	// Add a special case for the DESO pubkey to pay the Openfund pubkey.
+	// Add a special case for the DESO pubkey to pay the fork's founder-treasury.
+	// Upstream routed this fee to Openfund treasuries (BC1…/tBC…); the fork
+	// repoints it at its own founder-treasury. Fee economics are unchanged:
+	// single recipient at 10 basis points, so only the destination differs.
 	// TODO: We hardcode this for now so we can launch quickly.
 	if IsDesoPkid(profilePublicKey) {
-		openfundPkid := "BC1YLj3zNA7hRAqBVkvsTeqw7oi4H6ogKiAFL1VXhZy6pYeZcZ6TDRY"
-		if params.NetworkType == lib.NetworkType_TESTNET {
-			openfundPkid = "tBCKWUK6mKhWpT4quLZjM2iPqPMwEWnHuj4Q99vSS4jFRLGeFJ3G3p"
-		}
+		founderTreasuryPkid := "FS13zB3hyv7V3nnMx5Dikp8NMGpDfrcQ1MWVz8nptRygd446NTVawA"
 		return map[string]uint64{
-			openfundPkid: 10,
+			founderTreasuryPkid: 10,
 		}, false, nil
 	}
 

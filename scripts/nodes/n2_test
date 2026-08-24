@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
-
+# UPSTREAM-DEPRECATED: rewritten for the forked-social launch. This script
+# previously ran an upstream DeSo testnet/regtest node — removed.
+#
+# Runs a local fork testnet (regtest-style) peer for sandbox testing.
 DATE=`date +%Y%m%d-%H:%M:%S-%N`
 
 COMMAND="./backend run
   --glog-v=0
-  --glog-vmodule="*bitcoin-manager*=0,*balance*=0,*frontend*=0,*peer*=0,*addr*=0,*network*=0,*utils*=0,*connection*=0,*main*=0,*server*=0,*mempool*=0,*miner*=2,*blockchain*=0"
-  --testnet=true
-  --admin-public-keys=*
-  --super-admin-public-keys=*
+  --forknet-testnet
+  --admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko
+  --super-admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko
   --regtest
-  --connect-ips=localhost:19000
-  --api-port=20001
-  --protocol-port=20000
+  --connect-ips=localhost:42420
+  --api-port=42422
+  --protocol-port=42423
   --private-mode=true
   --num-mining-threads=1
-  --data-dir=/tmp/fe2-$DATE
-  --block-cypher-api-key=092dae962ea44b02809a4c74408b42a1"
+  --data-dir=/tmp/fork-n2-test-$DATE"
 
-  # --miner_public_keys=
+  # --miner-public-keys=FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv
 
 rm /tmp/main.*.log
 (cd ../../ && go build -o backend main.go && $COMMAND )
-
-

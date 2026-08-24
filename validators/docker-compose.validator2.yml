@@ -1,0 +1,55 @@
+# forked-social PoS VALIDATOR 2 — podman-compose definition.
+#
+# Install at /opt/validator2/docker-compose.validator2.yml (root:root 0644).
+# This file mirrors backend/podman-compose.yml (the SEED node) so both run the
+# same backend image with the same volume/convention layout:
+#     host /opt/validator2/data/chain  <- badger chain DB + checkpoints  (/data)
+#     host /opt/validator2/data/logs   <- glog *.INFO/*.WARNING/...      (/logs)
+# Pre-create the data dirs once:
+#     sudo install -d -o deploy -g deploy -m 0755 /opt/validator2/data/chain /opt/validator2/data/logs
+#
+# IMAGE: same convention as the seed — the tag is NOT baked in. Pull the same
+# tag the seed runs and export it, e.g.:
+#     podman pull ghcr.io/forked-social/backend:<tag>
+#     IMAGE=ghcr.io/forked-social/backend:<tag> \
+#       podman-compose -f /opt/validator2/docker-compose.validator2.yml up -d
+# Filenames: validator1 and validator3 use docker-compose.validator1.yml /
+# docker-compose.validator3.yml with /opt/validatorN/... paths. All three
+# validators run on the SAME server as the seed node, so each publishes its
+# OWN port pair: validator1 42100/42101, validator2 42200/42201,
+# validator3 42300/42301 (seed keeps 42000/42001).
+#
+# ⚠️ SECRETS: POS_VALIDATOR_SEED lives in validator2.env (next to this file,
+# 0600, runtime-injected). It is validator 2's BLS mnemonic and MUST be the
+# SAME mnemonic the bootstrap script consumed as VALIDATOR2_BLS_SEED when it
+# registered the validator on-chain (see backend/scripts/pos/validator_bootstrap/
+# and backend/validators/README.md). NEVER commit it.
+services:
+  validator2:
+    image: ${IMAGE:?IMAGE not set — podman pull the backend tag and export IMAGE}
+    container_name: validator2
+    pull_policy: never              # operator podman-pulled the exact tag
+    restart: unless-stopped         # process-crash restart within a boot; systemd handles reboot
+    env_file:
+      - validator2.env              # DATA_DIR=/data, LOG_DIR=/logs, POS_VALIDATOR_SEED=... (0600!)
+    environment:
+      # --- fixed forked-social network wiring (mirror of the seed node) ---
+      FORKNET: "true"                                 # fork mainnet params (FS1…, default ports 42000/42001)
+      PROTOCOL_PORT: "42200"                          # P2P inside the container (default 42000 — distinct per validator, shared host)
+      API_PORT: "42201"                               # REST/RPC inside the container
+      CONNECT_IPS: node.forked.social:42000           # persistent link to the seed (DNS seeds are empty by design)
+      CHECKPOINT_SYNCING_PROVIDERS: https://node.forked.social
+    volumes:
+      - /opt/validator2/data/chain:/data
+      - /opt/validator2/data/logs:/logs
+    #
+    # --- ports -----------------------------------------------------------------
+    # P2P 42200 MUST be publicly reachable: the validator mesh dials the domain
+    # registered on-chain for this validator — node.forked.social:42200
+    # (covered by the existing node.forked.social DNS record; distinct ports
+    # keep the listeners apart — see README). The API port 42201 is
+    # published on loopback only, for admin access over SSH port-forwarding:
+    #   ssh -L 42201:127.0.0.1:42201 <server>   then curl 127.0.0.1:42201
+    ports:
+      - "42200:42200"             # P2P protocol port (fork mainnet) — PUBLIC
+      - "127.0.0.1:42201:42201"   # REST/RPC (API_PORT=42201) — loopback/admin only

@@ -1,48 +1,29 @@
 #!/usr/bin/env bash
-
+# UPSTREAM-DEPRECATED: this script was rewritten for the forked-social launch.
+# It previously started an upstream DeSo testnet/regtest node using the public
+# upstream development mnemonic ("verb find card ship...") — removed. Seeds are
+# now runtime-injected; never add seed phrases or mnemonics to this file.
+#
+# Runs a local fork-testnet (regtest-style) node. Fill in seeds at runtime.
 DATE=`date +%Y%m%d-%H:%M:%S-%N`
-
-# Seeds. This is the account corresponding to the public key below.
-# * Mnemonic:
-#   * verb find card ship another until version devote guilt strong lemon six
-# * DeSo public keys:
-#   * BC1YLg7Bk5sq9iNY17bAwoAYiChLYpmWEi6nY6q5gnA1UQV6xixHjfV
-#   * tBCKVERmG9nZpHTk2AVPqknWc1Mw9HHAnqrTpW1RnXpXMQ4PsQgnmV
-# * Bitcoin burn addresses:
-#   * mhziDsPWSMwUqvZkVdKY92CjesziGP3wHL
-#   * 13UkvpJXdLWE4p68n4MAK6zQntQ1RHixyM
 
 rm /tmp/main.*.log
 
-# "-gcflags=”all=-N -l" was added to get GoLand debugger (Delve) to work, see
-# https://blog.jetbrains.com/go/2019/02/06/debugging-with-goland-getting-started/
-#
-# "If you are running with Go 1.10 or newer, you need to add ` -gcflags=”all=-N -l” `
-# to the ` go build ` command."
-
-(cd ../../ && go build -o backend -gcflags="all=-N -l" -tags="relic" main.go && ./backend run \
-  --glog-v=0 \
-  --glog-vmodule="*api*=0,*bitcoin_manager*=2,*balance*=0,*frontend*=0,*peer*=0,*addr*=0,*network*=0,*utils*=0,*connection*=0,*main*=0,server*=0,*mempool*=0,*miner*=0,*blockchain*=0,*block_producer*=1" \
-  --add-ips=localhost:19000 \
-  --testnet=true  \
+(cd ../../ && go build -o backend main.go && ./backend run \
+  --forknet-testnet \
   --regtest \
-  --api-port=18001 \
-  --protocol-port=18000 \
+  --glog-v=0 \
+  --api-port=42421 \
+  --protocol-port=42420 \
   --txindex \
-  --admin-public-keys=* \
-  --super-admin-public-keys=* \
+  --admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
+  --super-admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
   --num-mining-threads=1 \
-  --miner-public-keys=BC1YLg7Bk5sq9iNY17bAwoAYiChLYpmWEi6nY6q5gnA1UQV6xixHjfV \
-  --block-producer-seed='verb find card ship another until version devote guilt strong lemon six' \
-  --pos-validator-seed='verb find card ship another until version devote guilt strong lemon six' \
-  --starter-deso-seed='road congress client market couple bid risk escape artwork rookie artwork food' \
-  --data-dir=/tmp/n0_test_00000 \
-  --access-control-allow-origins=http://localhost:4200,http://localhost:80,http://localhost:18002,http://localhost:4201,http://localhost:18001,http://localhost:3000,localhost:3000 \
-  --secure-header-allow-hosts=localhost:4200 \
-  --secure-header-development=true \
-  --block-cypher-api-key=092dae962ea44b02809a4c74408b42a1 \
-  --min-satoshis-for-profile=0 \
-  --expose-global-state=true \
-  --show-processing-spinners=true \
-  --comp-profile-creation=true \
-  --metamask-airdrop-deso-nanos-amount=1000 )
+  --miner-public-keys=FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv \
+  --data-dir=/tmp/fork_n0_test \
+  --access-control-allow-origins=http://localhost:4200,http://localhost:80,http://localhost:42421 \
+  --min-satoshis-for-profile=0 )
+  # Runtime-injected secrets (do NOT commit values):
+  #   --block-producer-seed='<RUNTIME_INJECTED>'
+  #   --pos-validator-seed='<RUNTIME_INJECTED>'
+  #   --starter-deso-seed='<RUNTIME_INJECTED>'

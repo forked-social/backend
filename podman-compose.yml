@@ -30,10 +30,14 @@ services:
       - /opt/backend/data/chain:/data
       - /opt/backend/data/logs:/logs
     #
-    # --- service-specific runtime config (operator: fill these in) ---
-    # ports:
-    #   - "127.0.0.1:<REST_HOST_PORT>:<CONTAINER_API_PORT>"   # REST/RPC (set API_PORT in .env)
-    #   - "<P2P_HOST_PORT>:17000"                              # P2P (mainnet protocol port default 17000)
+    # --- forked-social seed node port publishing ---------------------------
+    # Protocol (P2P) port 42000 must be reachable from the internet so peers
+    # can connect (node.forked.social:42000). The API port 42001 is published
+    # on loopback only — terminate TLS on the host reverse proxy that serves
+    # https://node.forked.social. For the testnet-style seed use 42420/42421.
+    ports:
+      - "42000:42000"             # P2P protocol port (fork mainnet)
+      - "127.0.0.1:42001:42001"   # REST/RPC (API_PORT=42001, reverse-proxied)
     # environment:
     #   - DESO_CONFIG=/config/config.json
     # volumes (additional):
