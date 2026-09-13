@@ -18,6 +18,13 @@
 # Pre-create the data dirs deploy-owned once (deploy cannot create entries in
 # the root-owned service dir):
 #     sudo install -d -o deploy -g deploy -m 0755 /opt/backend/data/chain /opt/backend/data/logs
+
+x-podman:
+  in_pod: false          # single container, own netns; honored by podman-compose >=1.3.0,
+                         # ignored (harmlessly) on 1.0.x which don't create pods by default.
+                         # REQUIRED on Debian 13/trixie podman-compose 1.3.0: with default
+                         # pod mode both ports: publishes were silently dropped (empty
+                         # PortBindings) — API loopback unreachable.
 services:
   backend:
     image: ${IMAGE:?IMAGE not set — run deploy.sh, which writes /opt/backend/.deploy}
@@ -36,8 +43,13 @@ services:
     # on loopback only — terminate TLS on the host reverse proxy that serves
     # https://node.forked.social. For the testnet-style seed use 42420/42421.
     ports:
-      - "42000:42000"             # P2P protocol port (fork mainnet)
-      - "127.0.0.1:42001:42001"   # REST/RPC (API_PORT=42001, reverse-proxied)
+      - target: 42000             # P2P protocol port (fork mainnet) — public (0.0.0.0)
+        published: "42000"
+        protocol: tcp
+      - target: 42001             # REST/RPC (API_PORT=42001) — host loopback ONLY
+        published: "42001"
+        protocol: tcp
+        host_ip: "127.0.0.1"
     # environment:
     #   - DESO_CONFIG=/config/config.json
     # volumes (additional):

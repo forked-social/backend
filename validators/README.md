@@ -98,6 +98,10 @@ Miner (funder, holds the entire genesis supply): `FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ
 2. **Firewall**: inbound TCP **42000, 42100, 42200, 42300 open to the
    internet** on the server (P2P for seed + validators 1-3). The API ports
    42001 / 42101 / 42201 / 42301 stay loopback-only.
+   ```sh
+   # After the seed is up, verify from OUTSIDE (the validator mesh + CONNECT_IPS depend on it):
+   timeout 5 bash -c '</dev/tcp/node.forked.social/42000' && echo P2P-OPEN
+   ```
 3. **Image**: CI (`build-and-publish.yml`) built + pushed
    `ghcr.io/forked-social/backend:<tag>`; `podman pull` it once on the server —
    the seed and all three validators run the same image.
@@ -190,7 +194,14 @@ podman logs backend 2>&1 | grep -E 'Network selection|Protocol listening|DNSSeed
 #   peers on :17000, "DNSSeeds: 10", or a ~38M-header download ⇒ a stale
 #   old-network container/env — redo step 0.
 
-# 5) Wait for readiness + watch the height climb (2s blocks):
+# 5) Assert the port publishes actually took: empty `podman port` output =
+#    publishes silently dropped (seen on Debian 13/trixie podman-compose
+#    1.3.0 default pod mode; fixed by x-podman.in_pod: false in the compose
+#    file) — fix before proceeding; the curls below cannot work without it.
+podman port backend     # MUST print BOTH: 127.0.0.1:42001 -> 42001/tcp AND 0.0.0.0:42000 -> 42000/tcp
+ss -tln | grep -E '4200[01]'   # listeners required on 127.0.0.1:42001 and 0.0.0.0:42000
+
+# 6) Wait for readiness + watch the height climb (2s blocks):
 curl -s http://127.0.0.1:42001/api/v0/health-check        # -> 200
 curl -s -X POST http://127.0.0.1:42001/api/v0/get-app-state -H 'Content-Type: application/json' -d '{}'
 # "BlockHeight" should start advancing immediately.
