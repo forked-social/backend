@@ -154,12 +154,43 @@ unstake transactions as the network grows.
 ### Step 2 — start the seed node (this starts the ~5-minute clock)
 
 ```sh
-# Existing seed machinery at /opt/backend (FORKNET=true baked into
-# /opt/backend/.env by deploy.env; MINER_PUBLIC_KEYS mines the bootstrap window):
+# 0) Clean leftovers from any earlier deploy on this box. env_file is applied at
+#    container CREATION only: if an old `backend` container exists, `up` errors
+#    with "creating container storage: ... already in use" and then starts the
+#    STALE container with its old baked-in env (old-network ports/seeds/chain):
+podman-compose -f /opt/backend/podman-compose.yml down || true
+podman container exists backend && podman rm -f backend
+
+# 1) FIRST LAUNCH ONLY — wipe any old-network chain data.
+#    **⚠️ DESTRUCTIVE — deletes the chain DB permanently.** With DATA_DIR=/data
+#    the node writes /data/v-00000 = /opt/backend/data/chain/v-00000 regardless
+#    of network, and a non-empty badger DB is trusted as-is (never re-genesis'd)
+#    — old-network state must not survive into the fork launch:
+rm -rf /opt/backend/data/chain/*
+
+# 2) Sanity-check /opt/backend/.env against backend/deploy.env:
+grep -E '^(FORKNET|API_PORT|MINER_PUBLIC_KEYS)=' /opt/backend/.env
+#   must show: FORKNET=true / API_PORT=42001 /
+#              MINER_PUBLIC_KEYS=FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp
+grep -E '^CONNECT_IPS=' /opt/backend/.env || echo "CONNECT_IPS unset (correct for the seed)"
+
+# 3) Start (FORKNET=true baked into /opt/backend/.env by deploy.env;
+#    MINER_PUBLIC_KEYS mines the bootstrap window). On cold start
+#    "updateCheckpointBlockInfo: ... connection refused" is EXPECTED — the seed
+#    self-references https://node.forked.social, unreachable until it is up:
 IMAGE=ghcr.io/forked-social/backend:<tag> \
   podman-compose -f /opt/backend/podman-compose.yml up -d
 
-# Wait for readiness + watch the height climb (2s blocks):
+# 4) Assert fork-mainnet selection in the logs (NOT old-network defaults):
+podman logs backend 2>&1 | grep -E 'Network selection|Protocol listening|DNSSeeds|Mining with public keys'
+#   must show: "Network selection: forked-social network (mainnet-style: FS1
+#               prefixes, protocol port 42000, API port 42001)",
+#              "Protocol listening on port 42000", "Looking for DNSSeeds: 0",
+#              "Mining with public keys: [FS13xKCgh…]"
+#   peers on :17000, "DNSSeeds: 10", or a ~38M-header download ⇒ a stale
+#   old-network container/env — redo step 0.
+
+# 5) Wait for readiness + watch the height climb (2s blocks):
 curl -s http://127.0.0.1:42001/api/v0/health-check        # -> 200
 curl -s -X POST http://127.0.0.1:42001/api/v0/get-app-state -H 'Content-Type: application/json' -d '{}'
 # "BlockHeight" should start advancing immediately.
