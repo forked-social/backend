@@ -67,11 +67,11 @@ the same lib calls (`lib.NewBLSKeystore` +
 
 | # | DeSo pubkey (from `VALIDATORN_SEED`) | Registered domain | Default DNS host |
 |---|---|---|---|
-| 1 | `FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W` | `node.forked.social:42100` | `node.forked.social` |
-| 2 | `FS13vueAs3CmmPBjm5PnsyjbiUHegNHyNXmCcLdu1A6hh9tc2qHB74` | `node.forked.social:42200` | `node.forked.social` |
-| 3 | `FS13w9xhKm1vbvDWQKSvZPCqNkQMLFDurJ2TRNw5zjsod4kM1DS1wE` | `node.forked.social:42300` | `node.forked.social` |
+| 1 | `FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC` | `node.forked.social:42100` | `node.forked.social` |
+| 2 | `FS13wDSF4DStnXnDGe6c8i1nuPkav5VQh5NQw7DfBAzTWzfoc6qMAC` | `node.forked.social:42200` | `node.forked.social` |
+| 3 | `FS13vXnYzpczMkW9Hbk3czZLs4nwSwwu23hhsbHQoZ2oiFJwkGF1rh` | `node.forked.social:42300` | `node.forked.social` |
 
-Miner (funder, holds the entire genesis supply): `FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv`.
+Miner (funder, holds the entire genesis supply): `FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp`.
 
 ## Timing constraints (why the order below matters)
 
@@ -292,11 +292,11 @@ curl -s https://node.forked.social/api/v0/current-epoch-progress | jq .
 
 # Validator entries — expect the registered domain + voting pubkey and, once
 # active, Status ACTIVE and TotalStakeAmountNanos = 5000000000000000:
-curl -s https://node.forked.social/api/v0/validators/FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W | jq .
+curl -s https://node.forked.social/api/v0/validators/FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC | jq .
 # (same for the v2/v3 keys)
 
 # Each validator's self-stake (5,000,000 coins = 5e15 nanos):
-curl -s https://node.forked.social/api/v0/stake/FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W/FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W | jq .
+curl -s https://node.forked.social/api/v0/stake/FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC/FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC | jq .
 
 # Height must keep climbing THROUGH and past 300 (PoS block production):
 curl -s -X POST https://node.forked.social/api/v0/get-app-state -H 'Content-Type: application/json' -d '{}' | jq .BlockHeight

@@ -20,5 +20,5 @@ rm /tmp/main.*.log
   --txindex=true \
   --admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
   --super-admin-public-keys=FS13vrbSsSRefiNeoJK5uHMKgCwzJJ3NMCFdEKpui7qPX4X7xSLSko \
-  --miner-public-keys=FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv
+  --miner-public-keys=FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp
 )

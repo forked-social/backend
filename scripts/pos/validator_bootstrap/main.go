@@ -17,16 +17,16 @@
 //
 //	MINER_SEED             REQUIRED. The fork miner mnemonic. It holds the
 //	                       entire genesis supply (0x-supply UTXO to
-//	                       FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv,
+//	                       FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp,
 //	                       30,000,000 coins at genesis) and funds every
 //	                       validator with 5,125,000 coins.
 //	VALIDATOR{N}_SEED      Per validator N∈{1,2,3}: the validator's DeSo
 //	                       mnemonic. Its derived key (index 0) signs the
 //	                       register-as-validator and stake transactions and is
 //	                       expected to derive these launch identities:
-//	                         v1 FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W
-//	                         v2 FS13vueAs3CmmPBjm5PnsyjbiUHegNHyNXmCcLdu1A6hh9tc2qHB74
-//	                         v3 FS13w9xhKm1vbvDWQKSvZPCqNkQMLFDurJ2TRNw5zjsod4kM1DS1wE
+//	                         v1 FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC
+//	                         v2 FS13wDSF4DStnXnDGe6c8i1nuPkav5VQh5NQw7DfBAzTWzfoc6qMAC
+//	                         v3 FS13vXnYzpczMkW9Hbk3czZLs4nwSwwu23hhsbHQoZ2oiFJwkGF1rh
 //	VALIDATOR{N}_BLS_SEED  Per validator N: the validator's BLS mnemonic. The
 //	                       BLS key pair + voting authorization are derived
 //	                       IN-PROCESS with the same lib functions the node and
@@ -120,12 +120,12 @@ const (
 
 // Launch identities (public keys only — the corresponding mnemonics are
 // runtime-injected env vars; they are NEVER written to code or logs).
-const expectedMinerPubKey = "FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv"
+const expectedMinerPubKey = "FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp"
 
 var expectedValidatorPubKeys = map[int]string{
-	1: "FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W",
-	2: "FS13vueAs3CmmPBjm5PnsyjbiUHegNHyNXmCcLdu1A6hh9tc2qHB74",
-	3: "FS13w9xhKm1vbvDWQKSvZPCqNkQMLFDurJ2TRNw5zjsod4kM1DS1wE",
+	1: "FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC",
+	2: "FS13wDSF4DStnXnDGe6c8i1nuPkav5VQh5NQw7DfBAzTWzfoc6qMAC",
+	3: "FS13vXnYzpczMkW9Hbk3czZLs4nwSwwu23hhsbHQoZ2oiFJwkGF1rh",
 }
 
 // defaultValidatorDomains must match the published P2P ports

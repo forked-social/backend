@@ -18,7 +18,7 @@ COMMAND="./backend run
   --num-mining-threads=1
   --data-dir=/tmp/fork-n2-test-$DATE"
 
-  # --miner-public-keys=FS13xm5oxJvGKd7194u5f2paA9WaaQpZSvz7Tzu8uXDngxromi3Lnv
+  # --miner-public-keys=FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp
 
 rm /tmp/main.*.log
 (cd ../../ && go build -o backend main.go && $COMMAND )

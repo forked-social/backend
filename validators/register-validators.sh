@@ -33,9 +33,9 @@ CUTOVER_BLOCK_HEIGHT=300
 # Launch identities (PUBLIC keys only — mnemonics are env-injected, never in
 # this file; see backend/validators/README.md).
 VALIDATOR_PUBKEYS=(
-  "FS13wSsnnLhYeVfjNyvc8HE6f7iWGG6bHJx6Kb5wKR513QJrNQdq5W"
-  "FS13vueAs3CmmPBjm5PnsyjbiUHegNHyNXmCcLdu1A6hh9tc2qHB74"
-  "FS13w9xhKm1vbvDWQKSvZPCqNkQMLFDurJ2TRNw5zjsod4kM1DS1wE"
+  "FS13x89UTTzWArjrKfAouqxTVsseXw6EEx1xaXYFsNhpXdWrfAx9SC"
+  "FS13wDSF4DStnXnDGe6c8i1nuPkav5VQh5NQw7DfBAzTWzfoc6qMAC"
+  "FS13vXnYzpczMkW9Hbk3czZLs4nwSwwu23hhsbHQoZ2oiFJwkGF1rh"
 )
 
 REQUIRED_ENV=(
