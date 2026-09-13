@@ -17,8 +17,14 @@ on:
           Repository that provides the sibling `core` build context.
           The production Dockerfile COPYs from `../core`, so this is checked
           out next to `backend` to assemble the expected monorepo layout.
+          The default is this fork's core, NOT upstream deso-protocol/core:
+          backend/go.mod replaces github.com/deso-protocol/core with the
+          sibling checkout, and the forked backend sources reference
+          lib.ForkMainnetParams / lib.ForkTestnetParams, which exist only
+          in the fork's core/lib/fork_params.go. Building against upstream
+          core fails with `undefined: lib.Fork*Params`.
         required: false
-        default: "deso-protocol/core"
+        default: "forked-social/core"
         type: string
       core_ref:
         description: Git ref to check out for the `core` build context.
@@ -46,9 +52,13 @@ jobs:
       #   COPY backend/go.mod backend/
       #   COPY core/go.mod     core/
       #   COPY core/bls        ../core/bls
-      # Since `backend` is a standalone repo, a plain checkout would not
-      # provide `core/`. We therefore check out `core` as a sibling so the
-      # workspace root matches the Dockerfile's expected context.
+        # Since `backend` is a standalone repo, a plain checkout would not
+        # provide `core/`. We therefore check out `core` as a sibling so the
+        # workspace root matches the Dockerfile's expected context.
+        # The default repository is the FORK's core (forked-social/core):
+        # the replace in backend/go.mod compiles the backend against this
+        # checkout, and upstream core lacks the fork-only lib.Fork*Params
+        # symbols the backend needs (see the core_repository input notes).
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.core_repository }}
