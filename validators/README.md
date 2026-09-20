@@ -19,7 +19,10 @@ All four nodes share the single `node.forked.social` DNS record (one host,
 pointing at that server IP) — the distinct ports keep the P2P listeners and
 API endpoints apart. Validators dial the seed via
 `CONNECT_IPS=node.forked.social:42000` (unchanged); the mesh dials each
-validator at its registered domain/port above.
+validator at its registered domain/port above. Note that on this
+single-server topology every mesh connection appears source-NATed to the
+container network's gateway IP (the rootless-podman hairpin through the
+host's public IP), so peers are NOT distinguishable by source IP.
 
 ## File map (exact names — referenced by other docs)
 
@@ -323,7 +326,12 @@ seed — the fork has **no DNS seeds by design**),
 `PROTOCOL_PORT`/`API_PORT` (42100/42101, 42200/42201, 42300/42301 — matching
 the registered domains) with P2P public and API loopback-only for admin. Each
 validator uses its own host data dir (`/opt/validatorN/data/chain`,
-`/opt/validatorN/data/logs`).
+`/opt/validatorN/data/logs`). The env templates also set
+`ONE_INBOUND_PER_IP=false`: on this single-server topology the mesh dials
+each node via `node.forked.social:421x0`, which hairpins through rootless
+podman so every peer arrives from the same gateway IP — the one-inbound-per-ip
+anti-sybil limit (the core code default, kept for public nodes) would
+otherwise cap each node at a single inbound peer.
 
 ### Step 5 — what to check at the cutover (block 300)
 
