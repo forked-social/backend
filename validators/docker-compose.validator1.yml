@@ -24,6 +24,12 @@
 # SAME mnemonic the bootstrap script consumed as VALIDATOR1_BLS_SEED when it
 # registered the validator on-chain (see backend/scripts/pos/validator_bootstrap/
 # and backend/validators/README.md). NEVER commit it.
+
+x-podman:
+  in_pod: false          # single container, own netns; honored by podman-compose >=1.3.0,
+                         # ignored (harmlessly) on 1.0.x. REQUIRED on Debian 13/trixie
+                         # podman-compose 1.3.0: default pod mode silently drops ports:
+                         # publishes (infra-less pods cannot hold them).
 services:
   validator1:
     image: ${IMAGE:?IMAGE not set — podman pull the backend tag and export IMAGE}
