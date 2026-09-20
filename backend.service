@@ -1,21 +1,33 @@
-# Install at /etc/systemd/system/backend.service (root:root 0644), then:
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable --now backend.service
+# forked-social SEED node — podman-compose boot unit (system unit, runs rootless
+# as deploy). Install at /etc/systemd/system/backend.service (root:root 0644).
 #
-# Prerequisites on the host (see .env/setup/deploy-user-setup.md + deploy.sh):
-#   * the deploy account exists and owns /opt/backend/.deploy (written by deploy.sh);
-#   * `sudo loginctl enable-linger deploy` so /run/user/<deploy-uid> exists at boot
-#     (rootless podman needs XDG_RUNTIME_DIR);
-#   * /opt/backend/podman-compose.yml + /opt/backend/deploy.sh installed
-#     (deploy.sh root:root 0755; the dir root:root 0755);
-#   * deploy can pull the image: either the GHCR package is PUBLIC or you have
-#     run `sudo -u deploy podman login ghcr.io` with a token on the server.
+# This is the SEED of a 4-unit family on this host:
+#   backend.service        /opt/backend                               42000/42001
+#   validator{1,2,3}.service /opt/validatorN  (templates: backend/validators/)
+#                                                           421x0/421x1
+# Rules that keep the chain alive (see backend/validators/OPS.md):
+#   * restart validators ONE AT A TIME with verification gates — quorum needs
+#     ALL 3 (3·Cq ≥ 2N+1); seed restarts are free (non-consensus follower
+#     since the block-300 PoS cutover);
+#   * IMAGE comes from /opt/backend/.deploy — keep it synced to what runs
+#     (deploy.sh writes it; a STALE tag here silently rolls the node back on
+#     the next unit restart);
+#   * env is baked at container CREATION — the down/up below is what makes
+#     env-file edits take effect; `up` alone would reuse a stale container.
+#
+# Prerequisites (see .env/setup/deploy-user-setup.md Steps 3b-3d):
+#   * linger enabled for deploy (`loginctl enable-linger deploy`) so
+#     /run/user/<uid> exists at boot (rootless podman needs XDG_RUNTIME_DIR);
+#   * the image referenced by .deploy pulled locally (pull_policy: never —
+#     only deploy.sh ever pulls);
+#   * /opt/backend/{podman-compose.yml,.env} installed root-owned; data dirs
+#     at /opt/backend/data/{chain,logs} deploy-owned.
 
 [Unit]
-Description=backend podman-compose service (runs as deploy)
+Description=backend (seed) podman-compose service (runs as deploy)
 Documentation=file:///opt/backend/podman-compose.yml
 Wants=network-online.target
-After=network-online.target podman.socket
+After=network-online.target
 
 [Service]
 Type=oneshot
@@ -29,12 +41,24 @@ Environment=XDG_RUNTIME_DIR=/run/user/%U
 # environment so the podman-compose child interpolates ${IMAGE}.
 EnvironmentFile=-/opt/backend/.deploy
 
+# Rootless runtime dir can appear a few seconds into boot (linger starts
+# user@<uid>.service); wait rather than race it.
+ExecStartPre=/bin/sh -c 'i=0; while [ ! -d /run/user/%U ] && [ "$i" -lt 15 ]; do sleep 1; i=$((i+1)); done; [ -d /run/user/%U ]'
+# Recreate (not reuse): env_file applies at container CREATION only.
 ExecStartPre=-/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml down'
 ExecStart=/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml up -d'
+# Port gate: both publishes must exist. Empty `podman port` output = the
+# Debian 13/trixie podman-compose 1.3.0 silent port-drop (x-podman.in_pod:
+# false in the compose file is the primary fix; this makes any regression
+# fail the unit loudly instead of leaving the API unreachable).
+ExecStartPost=/bin/sh -c 'podman port backend 2>/dev/null | grep -q "0.0.0.0:42000" && podman port backend 2>/dev/null | grep -q "127.0.0.1:42001"'
 ExecStop=/bin/sh -c 'cd /opt/backend && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/backend/podman-compose.yml down'
 
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=180
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target

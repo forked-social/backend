@@ -1,0 +1,54 @@
+# forked-social PoS VALIDATOR 2 — podman-compose boot unit (system unit, runs
+# rootless as deploy). Install at /etc/systemd/system/validator2.service
+# (root:root 0644). Template lives here; validator1/validator3 are this file
+# with every "2" in {validator2, 42200, 42201} replaced accordingly.
+#
+# ⚠️ RESTART DISCIPLINE (see backend/validators/OPS.md): quorum needs ALL 3
+# validators (3·Cq ≥ 2N+1) — restarting this unit PAUSES block production
+# until the validator rejoins (view-timeout backoff; 48-epoch jail grace
+# protects it from eviction). Only ever restart validators ONE AT A TIME and
+# verify between: unit active → container Up → `podman port` both mappings →
+# health-check 200 → height climbing on the seed API. NEVER restart two
+# validator units concurrently.
+#
+# After=backend.service is CONVENIENCE, not a dependency: validators retry
+# CONNECT_IPS (node.forked.social:42000) forever, so they boot fine without
+# the seed; ordering merely avoids a few seconds of futile dialing. Do NOT
+# add Wants=/BindsTo= on the seed here.
+#
+# IMAGE comes from /opt/validator2/.deploy (kept in sync with the seed's by
+# deploy.sh's orchestrated rollout); env is baked at container CREATION — the
+# down/up below is what makes validator2.env edits take effect.
+
+[Unit]
+Description=validator2 podman-compose service (runs as deploy)
+Documentation=file:///opt/validator2/docker-compose.validator2.yml
+Wants=network-online.target
+After=network-online.target backend.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/validator2
+Environment=HOME=/home/deploy
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+EnvironmentFile=-/opt/validator2/.deploy
+
+ExecStartPre=/bin/sh -c 'i=0; while [ ! -d /run/user/%U ] && [ "$i" -lt 15 ]; do sleep 1; i=$((i+1)); done; [ -d /run/user/%U ]'
+ExecStartPre=-/bin/sh -c 'cd /opt/validator2 && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/validator2/docker-compose.validator2.yml down'
+ExecStart=/bin/sh -c 'cd /opt/validator2 && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/validator2/docker-compose.validator2.yml up -d'
+# Port gate (P2P public + API loopback): catches the trixie pod-mode port
+# drop at boot; a failed gate fails the unit → down/up retry.
+ExecStartPost=/bin/sh -c 'podman port validator2 2>/dev/null | grep -q "0.0.0.0:42200" && podman port validator2 2>/dev/null | grep -q "127.0.0.1:42201"'
+ExecStop=/bin/sh -c 'cd /opt/validator2 && C="$(command -v podman-compose >/dev/null 2>&1 && echo podman-compose || echo podman\ compose)"; exec $C -f /opt/validator2/docker-compose.validator2.yml down'
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=180
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

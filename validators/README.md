@@ -33,6 +33,8 @@ host's public IP), so peers are NOT distinguishable by source IP.
 | `backend/validators/docker-compose.validator2.yml` | validator 2 podman-compose (host `/opt/validator2/…`) |
 | `backend/validators/docker-compose.validator3.yml` | validator 3 podman-compose (host `/opt/validator3/…`) |
 | `backend/validators/validator{1,2,3}.env.example` | templates for `/opt/validatorN/validatorN.env` (the only secrets file, 0600) |
+| `backend/validators/validator{1,2,3}.service` | systemd boot/restart units for the validators (install to `/etc/systemd/system/`) |
+| `backend/validators/OPS.md` | **day-2 ops**: restart policy & gates, deploy rollouts, reboot drills, troubleshooting |
 | `backend/scripts/pos/validator_bootstrap/main.go` | launch-day bootstrap tool (fund → register → stake, `--dry-run` supported) |
 | `backend/scripts/pos/validator_registration.go` | single-validator manual tool for re-registrations / day-2 ops (env-driven, see below) |
 
@@ -305,14 +307,23 @@ sudoedit /opt/validator1/validator1.env     # POS_VALIDATOR_SEED=<v1 BLS mnemoni
 sudo chmod 0600 /opt/validator1/validator1.env
 ```
 
-Then start the containers (same image tag as the seed, one per validator):
+Then start the validators via their systemd units (same image tag as the
+seed, one per validator) — first run the pull, make sure
+`/opt/validatorN/.deploy` holds that tag's ref, then:
 
 ```sh
 podman pull ghcr.io/forked-social/backend:<tag>
-IMAGE=ghcr.io/forked-social/backend:<tag> \
-  podman-compose -f /opt/validator1/docker-compose.validator1.yml up -d
-# (repeat with the validator2/validator3 compose files — same server)
+sudo systemctl enable --now validator1.service   # gates between validators — see OPS.md
+# (repeat with validator2/validator3 — NEVER all three at once: quorum needs
+#  all 3 validators; verify each with the gate set in backend/validators/OPS.md)
+```
 
+> Pre-systemd historical fallback (no unit, manual compose — do NOT use while
+> the units own the stacks; a manual `up` desyncs `.deploy` and rolls the
+> image back on the next unit restart):
+> `IMAGE=ghcr.io/forked-social/backend:<tag> podman-compose -f /opt/validator1/docker-compose.validator1.yml up -d`
+
+```sh
 # Sanity checks (validator 1 shown; ports 42100 / 42101 are v1's pair):
 podman logs validator1 | less        # should log: fork mainnet selection, Protocol listening on port 42100, peer connection
 curl -s http://127.0.0.1:42101/api/v0/health-check   # via ssh -L 42101:127.0.0.1:42101 <server>

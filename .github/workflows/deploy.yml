@@ -19,7 +19,10 @@ jobs:
   deploy:
     runs-on: ubuntu-24.04
     environment: deploy
-    timeout-minutes: 15
+    # Full chain rollout = seed (no pause) + 3 validators one-at-a-time with
+    # health gates (~1-3 min pause each) and worst-case per-validator rollback;
+    # keep headroom for slow views.
+    timeout-minutes: 60
     steps:
       - name: Resolve deploy host
         id: host
@@ -65,6 +68,11 @@ jobs:
           echo "Triggering deploy of tag '$TAG' for service 'backend' on $HOST:$DEPLOY_PORT ..."
           # Wire protocol: two tokens "<tag> <service>" -> sshd ForceCommand dispatcher
           # -> /opt/backend/deploy.sh "$TAG" "backend".
+          # On the forked-1 chain host this ssh command orchestrates the FULL rollout:
+          # seed canary first, then validator1..3 one at a time with gates + automatic
+          # per-validator rollback; the sequencing lives server-side in deploy.sh
+          # (see backend/validators/OPS.md). Same two-token SSH protocol, same wrapper,
+          # same allowlist, same secrets -- nothing else changes.
           # NOTE: no -i and no IdentitiesOnly here -- the key material comes from the ssh-agent;
           # adding IdentitiesOnly without -i would make ssh offer NO identities and auth would fail.
           ssh -p "$DEPLOY_PORT" \
