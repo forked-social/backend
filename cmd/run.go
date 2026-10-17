@@ -188,6 +188,36 @@ func init() {
 	runCmd.PersistentFlags().Uint64("metamask-airdrop-deso-nanos-amount", 0, "Amount of DESO in nanos to send to metamask users as an airdrop")
 	runCmd.PersistentFlags().String("hcaptcha-secret", "", "Secret key for hcaptcha service. Used to verify captcha token verifications.")
 	runCmd.PersistentFlags().StringSlice("peers-to-monitor", []string{}, "List of peer URLs to monitor for networking connectivity while the node is running.")
+
+	// Exchange rate sources. Both toggles default to disabled on this fork
+	// because neither price source exists here anymore (see the help strings).
+	// Env equivalents per the deployment convention (viper AutomaticEnv + the
+	// "-"->"_" replacer in root.go upper-cases each flag name into exactly its
+	// UPPER_SNAKE env name); the explicit BindEnv calls below pin those names,
+	// which deployed nodes already set via their .env env_file, keeping flag and
+	// env one source of truth. Precedence: an explicitly-set flag wins over the
+	// env var, even when set to false; with the flag unset, the env var applies;
+	// otherwise the flag default keeps the source disabled.
+	runCmd.PersistentFlags().Bool("deso-dex-rate-enabled", false,
+		"If set, each exchange-rate refresh also queries the on-chain DeSoDex market "+
+			"(the dusdc_ DAOCoin pair) for the $DESO price. Disabled by default: no dusdc_ "+
+			"profile exists on this fork (it was a pre-fork artifact), so the lookup fails "+
+			"every refresh and floods the ERROR logs. While disabled the DeSoDex price is "+
+			"treated as unavailable (0) and the gate price is used instead - exactly what the "+
+			"failing lookup produced at runtime. Only enable once the dusdc_ profile is "+
+			"restored. Env equivalent: DESO_DEX_RATE_ENABLED; this flag wins when both are set.")
+	runCmd.PersistentFlags().Bool("blockchain-com-rate-enabled", false,
+		"If set, each exchange-rate refresh also fetches the $DESO price from the "+
+			"blockchain.com CLOUT-USD ticker. Disabled by default: CLOUT-USD is a delisted "+
+			"pre-rename mainnet symbol that answers with a zeroed ticker, and this fork's "+
+			"token has no blockchain.com listing, so the fetch yields 0 or errors every "+
+			"refresh and floods the ERROR logs. While disabled the price stays 0 - what the "+
+			"failing fetch already yields today. Only enable once a real listing under a "+
+			"correct symbol is configured. Env equivalent: BLOCKCHAIN_COM_RATE_ENABLED; this "+
+			"flag wins when both are set.")
+	viper.BindEnv("deso-dex-rate-enabled", "DESO_DEX_RATE_ENABLED")
+	viper.BindEnv("blockchain-com-rate-enabled", "BLOCKCHAIN_COM_RATE_ENABLED")
+
 	runCmd.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
 		viper.BindPFlag(flag.Name, flag)
 	})

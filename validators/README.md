@@ -185,8 +185,13 @@ grep -E '^CONNECT_IPS=' /opt/backend/.env || echo "CONNECT_IPS unset (correct fo
 
 # 3) Start (FORKNET=true baked into /opt/backend/.env by deploy.env;
 #    MINER_PUBLIC_KEYS mines the bootstrap window). On cold start
-#    "updateCheckpointBlockInfo: ... connection refused" is EXPECTED — the seed
-#    self-references https://node.forked.social, unreachable until it is up:
+#    "updateCheckpointBlockInfo: ... connection refused" is EXPECTED EXACTLY
+#    ONCE — the blockchain's first checkpoint update runs before the API server
+#    is listening, so even the loopback self-reference cannot answer yet; it
+#    succeeds from then on (provider switched to http://127.0.0.1:42001 in
+#    deploy.env — PENDING COMMIT/DEPLOY; until that rolls out,
+#    CHECKPOINT_SYNCING_PROVIDERS=https://node.forked.social still repeats the
+#    error every ~60s via the FastHotStuff transition retry timer):
 IMAGE=ghcr.io/forked-social/backend:<tag> \
   podman-compose -f /opt/backend/podman-compose.yml up -d
 
@@ -333,7 +338,11 @@ ls /opt/validator1/data/logs        # glog output: backend.INFO etc.
 The container wiring (already encoded in the compose files, do not change):
 `FORKNET=true`, `CONNECT_IPS=node.forked.social:42000` (persistent link to the
 seed — the fork has **no DNS seeds by design**),
-`CHECKPOINT_SYNCING_PROVIDERS=https://node.forked.social`, per-validator
+`CHECKPOINT_SYNCING_PROVIDERS=http://127.0.0.1:<own API port>` — each node
+self-checkpoints against its own loopback API: seed 42001, validators 42101 /
+42201 / 42301 (PENDING COMMIT; the previous `https://node.forked.social` value
+only becomes a valid join-node provider once a properly secured host reverse
+proxy exists), per-validator
 `PROTOCOL_PORT`/`API_PORT` (42100/42101, 42200/42201, 42300/42301 — matching
 the registered domains) with P2P public and API loopback-only for admin. Each
 validator uses its own host data dir (`/opt/validatorN/data/chain`,

@@ -107,6 +107,19 @@ type Config struct {
 
 	// URLs + optional port for peers that we may connect to and should monitor.
 	PeersToMonitor []string
+
+	// DesoDexRateEnabled enables the on-chain DeSoDex (dusdc_ DAOCoin pair)
+	// exchange rate source. Disabled by default: the dusdc_ profile does not exist
+	// on this fork (pre-fork artifact), so the lookup fails every refresh.
+	// Flag --deso-dex-rate-enabled / env DESO_DEX_RATE_ENABLED; see cmd/run.go.
+	DesoDexRateEnabled bool
+
+	// BlockchainComRateEnabled enables the blockchain.com CLOUT-USD ticker
+	// exchange rate source. Disabled by default: CLOUT-USD is a delisted
+	// pre-rename mainnet symbol and this fork's token has no blockchain.com
+	// listing, so the fetch yields 0 or errors every refresh.
+	// Flag --blockchain-com-rate-enabled / env BLOCKCHAIN_COM_RATE_ENABLED; see cmd/run.go.
+	BlockchainComRateEnabled bool
 }
 
 func LoadConfig(coreConfig *coreCmd.Config) *Config {
@@ -250,6 +263,11 @@ func LoadConfig(coreConfig *coreCmd.Config) *Config {
 		config.MetamaskAirdropEthMinimum = uint256.NewInt(0)
 	}
 	config.MetamaskAirdropDESONanosAmount = viper.GetUint64("metamask-airdrop-deso-nanos-amount")
+
+	// Exchange rate source toggles. Both default to disabled (flag default) on this
+	// fork; resolution order set-flag > env > disabled, see cmd/run.go.
+	config.DesoDexRateEnabled = viper.GetBool("deso-dex-rate-enabled")
+	config.BlockchainComRateEnabled = viper.GetBool("blockchain-com-rate-enabled")
 
 	return &config
 }

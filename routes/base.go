@@ -338,6 +338,30 @@ func (fes *APIServer) GetGateExchangeRate() (_exchangeRate float64, _err error) 
 	return usdCentsToDESOExchangePrice, nil
 }
 
+// blockchainComRateEnabled reports whether the blockchain.com CLOUT-USD price
+// source should be consulted. The toggle is resolved from
+// --blockchain-com-rate-enabled / env BLOCKCHAIN_COM_RATE_ENABLED into
+// Config at startup (see cmd/run.go; set flag wins over env, default disabled).
+// It defaults off on this fork because CLOUT-USD is a delisted pre-rename
+// mainnet symbol and this fork's token has no blockchain.com listing, so the
+// fetch yields 0 or errors on every refresh. While disabled the price stays 0 -
+// what the failing fetch already yields - so no consumer's value changes.
+func (fes *APIServer) blockchainComRateEnabled() bool {
+	return fes.Config != nil && fes.Config.BlockchainComRateEnabled
+}
+
+// desoDexRateEnabled reports whether the on-chain DeSoDex (dusdc_ DAOCoin pair)
+// price source should be consulted. The toggle is resolved from
+// --deso-dex-rate-enabled / env DESO_DEX_RATE_ENABLED into Config at startup
+// (see cmd/run.go; set flag wins over env, default disabled). It defaults off on
+// this fork because the dusdc_ profile entry was a pre-fork artifact and does
+// not exist here, so the lookup fails on every refresh. While disabled the
+// price stays 0 - what the failing lookup already produced - and
+// GetExchangeDeSoPrice keeps falling back to the gate price.
+func (fes *APIServer) desoDexRateEnabled() bool {
+	return fes.Config != nil && fes.Config.DesoDexRateEnabled
+}
+
 func (fes *APIServer) GetExchangeRateFromDeSoDex() (float64, error) {
 	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
 	if err != nil {
@@ -361,11 +385,23 @@ func (fes *APIServer) GetExchangeRateFromDeSoDex() (float64, error) {
 func (fes *APIServer) UpdateUSDCentsToDeSoExchangeRate() {
 	glog.V(2).Info("Refreshing exchange rate...")
 
-	// Fetch price from blockchain.com
-	blockchainDotComPrice, err := fes.GetBlockchainDotComExchangeRate()
-	glog.V(2).Infof("Blockchain.com price (USD cents): %v", blockchainDotComPrice)
-	if err != nil {
-		glog.Errorf("UpdateUSDCentsToDeSoExchangeRate: Error fetching exchange rate from blockchain.com: %v", err)
+	// Fetch price from blockchain.com. Gated off by default on this fork; see
+	// blockchainComRateEnabled. When disabled, blockchainDotComPrice stays 0, which
+	// is exactly what today's failing fetch yields, so
+	// MostRecentBlockchainDotComPriceUSDCents - and the two response fields that
+	// read it - carry the same value they already carry at runtime today.
+	var blockchainDotComPrice float64
+	if fes.blockchainComRateEnabled() {
+		var err error
+		blockchainDotComPrice, err = fes.GetBlockchainDotComExchangeRate()
+		glog.V(2).Infof("Blockchain.com price (USD cents): %v", blockchainDotComPrice)
+		if err != nil {
+			glog.Errorf("UpdateUSDCentsToDeSoExchangeRate: Error fetching exchange rate from blockchain.com: %v", err)
+		}
+	} else {
+		glog.V(2).Info("UpdateUSDCentsToDeSoExchangeRate: Skipping blockchain.com exchange rate fetch " +
+			"(the CLOUT-USD ticker is a pre-fork artifact with no listing on this network; set " +
+			"--blockchain-com-rate-enabled / BLOCKCHAIN_COM_RATE_ENABLED=true to re-enable it)")
 	}
 
 	// DEPRECATED: Fetch price from coinbase
@@ -382,10 +418,24 @@ func (fes *APIServer) UpdateUSDCentsToDeSoExchangeRate() {
 		glog.Errorf("UpdateUSDCentsToDeSoExchangeRate: Error fetching exchange rate from gate: %v", err)
 	}
 
-	desoDexPrice, err := fes.GetExchangeRateFromDeSoDex()
-	glog.V(2).Infof("DeSoDex price (USD Cents): %v", desoDexPrice)
-	if err != nil {
-		glog.Errorf("UpdateUSDCentsToDeSoExchangeRate: Error fetching exchange rate from DeSoDex: %v", err)
+	// The on-chain DeSoDex (dusdc_) rate source is gated off by default on this
+	// fork; see desoDexRateEnabled. When disabled, desoDexPrice stays 0, which
+	// is exactly what the dusdc_-lookup failure produced at runtime, so every
+	// consumer below behaves the same as it does today
+	// (MostRecentDesoDexPriceUSDCents == 0 sends GetExchangeDeSoPrice to its
+	// gate-price fallback).
+	var desoDexPrice float64
+	if fes.desoDexRateEnabled() {
+		var err error
+		desoDexPrice, err = fes.GetExchangeRateFromDeSoDex()
+		glog.V(2).Infof("DeSoDex price (USD Cents): %v", desoDexPrice)
+		if err != nil {
+			glog.Errorf("UpdateUSDCentsToDeSoExchangeRate: Error fetching exchange rate from DeSoDex: %v", err)
+		}
+	} else {
+		glog.V(2).Info("UpdateUSDCentsToDeSoExchangeRate: Skipping DeSoDex exchange rate fetch " +
+			"(the dusdc_ market does not exist on this fork; set " +
+			"--deso-dex-rate-enabled / DESO_DEX_RATE_ENABLED=true to re-enable it)")
 	}
 
 	// store the most recent exchange prices

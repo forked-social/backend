@@ -44,7 +44,9 @@ services:
       PROTOCOL_PORT: "42300"                          # P2P inside the container (default 42000 — distinct per validator, shared host)
       API_PORT: "42301"                               # REST/RPC inside the container
       CONNECT_IPS: node.forked.social:42000           # persistent link to the seed (DNS seeds are empty by design)
-      CHECKPOINT_SYNCING_PROVIDERS: https://node.forked.social
+      # Self-checkpoint via validator3's in-container loopback API. Do not use
+      # https://node.forked.social here until a host reverse proxy exists for 443.
+      CHECKPOINT_SYNCING_PROVIDERS: http://127.0.0.1:42301
     volumes:
       - /opt/validator3/data/chain:/data
       - /opt/validator3/data/logs:/logs
