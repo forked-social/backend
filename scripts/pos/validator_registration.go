@@ -16,7 +16,7 @@
 // # Environment variables (naming mirrors validator_bootstrap)
 //
 //	MINER_SEED          REQUIRED. Mnemonic of a funded key — the fork miner
-//	                    holds the entire genesis supply — that funds the
+//	                    holds the genesis allocation — that funds the
 //	                    validator with 5,125,000 coins before registration.
 //	VALIDATOR_SEED      REQUIRED. The validator's DeSo mnemonic. Its derived
 //	                    key (index 0) signs the register-as-validator and
@@ -34,7 +34,8 @@
 //	                    passed. Default: https://node.forked.social
 //
 // Amounts match validator_bootstrap: fund 5,125,000 coins (stake + 2.5%
-// fee/burn buffer), stake 5,000,000 coins.
+// fee/burn buffer), stake 5,000,000 coins, and register with the 5%
+// (500 basis point) launch commission on delegated stakes.
 //
 // # Usage (from backend/ inside the forked-builder container)
 //
@@ -74,6 +75,10 @@ const (
 	stakeNanos           uint64 = 5_000_000 * lib.NanosPerUnit // 5,000,000 coins staked
 	minFeeRateNanosPerKB uint64 = 1000
 
+	// Launch convention (matches validator_bootstrap): delegated stakes pay
+	// the validator a 5% commission; self-stakes never pay commission.
+	commissionBasisPoints uint64 = 500
+
 	// Manual day-2 tool: fixed waits between submissions (2s blocks).
 	submissionSettleDelay = 5 * time.Second
 	httpTimeout           = 30 * time.Second
@@ -97,7 +102,7 @@ const usageText = `validator_registration — single-validator manual registrati
 
 Required environment variables:
   MINER_SEED           funded key that pays for the registration (the fork
-                       miner holds the entire genesis supply)
+                       miner holds the genesis allocation)
   VALIDATOR_SEED       the validator's DeSo mnemonic (signs register + stake)
   VALIDATOR_BLS_SEED   the validator's BLS mnemonic (voting key; must match
                        the validator container's POS_VALIDATOR_SEED)
@@ -271,14 +276,15 @@ func constructRegisterAsValidatorTxn(
 	votingPubKey *bls.PublicKey, votingAuthorization *bls.Signature,
 ) (routes.ValidatorTxnResponse, error) {
 	request := routes.RegisterAsValidatorRequest{
-		TransactorPublicKeyBase58Check: lib.PkToString(validatorPubKey.ToBytes(), params),
-		Domains:                        []string{domain},
-		DisableDelegatedStake:          false,
-		VotingPublicKey:                votingPubKey.ToString(),
-		VotingAuthorization:            votingAuthorization.ToString(),
-		ExtraData:                      map[string]string{},
-		MinFeeRateNanosPerKB:           minFeeRateNanosPerKB,
-		TransactionFees:                []routes.TransactionFee{},
+		TransactorPublicKeyBase58Check:      lib.PkToString(validatorPubKey.ToBytes(), params),
+		Domains:                             []string{domain},
+		DisableDelegatedStake:               false,
+		DelegatedStakeCommissionBasisPoints: commissionBasisPoints,
+		VotingPublicKey:                     votingPubKey.ToString(),
+		VotingAuthorization:                 votingAuthorization.ToString(),
+		ExtraData:                           map[string]string{},
+		MinFeeRateNanosPerKB:                minFeeRateNanosPerKB,
+		TransactionFees:                     []routes.TransactionFee{},
 	}
 	return makePostRequest[routes.RegisterAsValidatorRequest, routes.ValidatorTxnResponse](
 		client, routes.RoutePathValidators+"/register", request)

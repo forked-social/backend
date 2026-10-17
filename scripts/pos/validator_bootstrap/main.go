@@ -16,9 +16,9 @@
 // # Environment variables (ALL secrets are read from ENV at runtime)
 //
 //	MINER_SEED             REQUIRED. The fork miner mnemonic. It holds the
-//	                       entire genesis supply (0x-supply UTXO to
+//	                       genesis allocation (0x-supply UTXO to
 //	                       FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp,
-//	                       30,000,000 coins at genesis) and funds every
+//	                       420,000,000 coins at genesis) and funds every
 //	                       validator with 5,125,000 coins.
 //	VALIDATOR{N}_SEED      Per validator N∈{1,2,3}: the validator's DeSo
 //	                       mnemonic. Its derived key (index 0) signs the
@@ -99,11 +99,17 @@ var params = &lib.ForkMainnetParams
 // young chain against 50%+ attacks; they are intended to be lowered via
 // normal unstake transactions as the network grows. 3 validators ×
 // 5,125,000 funded = 15,375,000 coins (15,000,000 staked), leaving
-// ~14,625,000 of the 30M genesis supply with the miner.
+// ~404,625,000 of the 420M genesis allocation with the miner.
 const (
 	fundingNanos         uint64 = 5_125_000 * lib.NanosPerUnit // 5,125,000 coins per validator (stake + 2.5% fee/burn buffer)
 	stakeNanos                  = 5_000_000 * lib.NanosPerUnit // 5,000,000 coins staked per validator
 	minFeeRateNanosPerKB uint64 = 1000
+
+	// Launch convention: registrations set a 5% delegated-stake commission.
+	// Consensus has no commission default — omitting the field would register
+	// every launch validator at 0. Self-stakes never pay commission; the 5%
+	// applies to third-party delegators' rewards only.
+	commissionBasisPoints uint64 = 500
 
 	// Epoch-1 snapshot is taken at block 145 (DefaultEpochDurationNumBlocks =
 	// 144, epoch 1 spans blocks 2..145). The guard aborts when the chain is
@@ -304,14 +310,15 @@ func constructSendDESOTxn(client *nodeClient, senderPubKey, recipientPubKey *lib
 
 func constructRegisterAsValidatorTxn(client *nodeClient, cfg *validatorConfig) (routes.ValidatorTxnResponse, error) {
 	request := routes.RegisterAsValidatorRequest{
-		TransactorPublicKeyBase58Check: lib.PkToString(cfg.pubKey.ToBytes(), params),
-		Domains:                        []string{cfg.domain},
-		DisableDelegatedStake:          false,
-		VotingPublicKey:                cfg.votingPubKey.ToString(),
-		VotingAuthorization:            cfg.votingAuth.ToString(),
-		ExtraData:                      map[string]string{},
-		MinFeeRateNanosPerKB:           minFeeRateNanosPerKB,
-		TransactionFees:                []routes.TransactionFee{},
+		TransactorPublicKeyBase58Check:      lib.PkToString(cfg.pubKey.ToBytes(), params),
+		Domains:                             []string{cfg.domain},
+		DisableDelegatedStake:               false,
+		DelegatedStakeCommissionBasisPoints: commissionBasisPoints,
+		VotingPublicKey:                     cfg.votingPubKey.ToString(),
+		VotingAuthorization:                 cfg.votingAuth.ToString(),
+		ExtraData:                           map[string]string{},
+		MinFeeRateNanosPerKB:                minFeeRateNanosPerKB,
+		TransactionFees:                     []routes.TransactionFee{},
 	}
 	return makePostRequest[routes.RegisterAsValidatorRequest, routes.ValidatorTxnResponse](
 		client, routes.RoutePathValidators+"/register", request)
