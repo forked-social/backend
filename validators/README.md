@@ -76,7 +76,7 @@ the same lib calls (`lib.NewBLSKeystore` +
 | 2 | `FS13wDSF4DStnXnDGe6c8i1nuPkav5VQh5NQw7DfBAzTWzfoc6qMAC` | `node.forked.social:42200` | `node.forked.social` |
 | 3 | `FS13vXnYzpczMkW9Hbk3czZLs4nwSwwu23hhsbHQoZ2oiFJwkGF1rh` | `node.forked.social:42300` | `node.forked.social` |
 
-Miner (funder, holds the entire genesis supply): `FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp`.
+Miner (funder, holds the 420M-coin genesis allocation): `FS13xKCghHsuC7Kw6eS1Y7cxePu3ZJ6PbYpxfaZzNcRKEQFXuFU2tp`.
 
 ## Timing constraints (why the order below matters)
 
@@ -155,8 +155,8 @@ Documented env surface of the tool (there is nothing else):
 `VALIDATOR{N}_DOMAIN` (optional), `API_URL` (optional; `--api-url` wins).
 Amounts are fixed: fund **5,125,000 coins** (stake + 2.5% fee/burn buffer),
 stake **5,000,000 coins**, per validator. Totals: 3 × 5,125,000 =
-**15,375,000 funded** (**15,000,000 staked**), leaving ~**14,625,000** of the
-30M genesis supply with the miner. The 5M-coin stakes are a launch-security
+**15,375,000 funded** (**15,000,000 staked**), leaving ~**404,625,000** of the
+420M genesis allocation with the miner. The 5M-coin stakes are a launch-security
 posture against 50%+ attacks and are intended to be lowered via normal
 unstake transactions as the network grows.
 
@@ -391,7 +391,9 @@ required variable is missing. Env vars (naming mirrors the bootstrap tool):
 | `API_URL` | no | API base URL (default `https://node.forked.social`; `--api-url` wins) |
 
 Amounts match the launch convention: fund **5,125,000 coins** (stake + 2.5%
-fee/burn buffer), stake **5,000,000 coins**. Example (in the builder
+fee/burn buffer), stake **5,000,000 coins**, and register with the **5%
+(500 bp) launch commission** on delegated stakes (self-stakes never pay
+commission). Example (in the builder
 container, from `backend/`):
 
 ```sh
